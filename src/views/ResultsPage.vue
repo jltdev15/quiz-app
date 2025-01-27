@@ -38,8 +38,11 @@
                 Summary</button>
             </td>
           </tr>
+ 
         </tbody>
+     
       </table>
+      <p v-if="quizStore.results.length === 0 " class=" py-3 text-center w-full">No records found</p>
     </div>
 
     <div v-if="showSummaryModal" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
