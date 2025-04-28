@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import apiClient from '../axiosClient';
+import { getDatabase, ref as dbRef, get, push, serverTimestamp } from 'firebase/database'
+import app from '../firebase'
 
 export const useQuizStore = defineStore('quiz', {
   state: () => ({
@@ -9,47 +10,123 @@ export const useQuizStore = defineStore('quiz', {
     score: 0,
     name: '',
     section: '',
-    results: []
+    results: [],
+    isLoading: false,
+    error: null
   }),
+
+  getters: {
+    totalQuestions: (state) => state.questions.length,
+    answeredQuestions: (state) => Object.keys(state.answers).length,
+    isQuizComplete: (state) => Object.keys(state.answers).length === state.questions.length,
+    scorePercentage: (state) => (state.score / state.questions.length) * 100,
+    currentQuestion: (state) => (index) => state.questions[index],
+    userAnswer: (state) => (questionId) => state.answers[questionId]
+  },
+
   actions: {
     async fetchResults() {
-      const response = await apiClient.get('/results/results');
-      this.results = response.data;
+      this.isLoading = true;
+      this.error = null;
+      try {
+        const db = getDatabase(app);
+        const resultsRef = dbRef(db, 'results');
+        const snapshot = await get(resultsRef);
+        
+        if (snapshot.exists()) {
+          this.results = Object.values(snapshot.val());
+        }
+      } catch (error) {
+        this.error = 'Failed to fetch results';
+        console.error('Error fetching results:', error);
+      } finally {
+        this.isLoading = false;
+      }
     },
+
     async fetchQuestions() {
-      const response = await apiClient.get('/questions');
-      this.questions = response.data;
+      this.isLoading = true;
+      this.error = null;
+      try {
+        const db = getDatabase(app);
+        const questionsRef = dbRef(db, 'questions');
+        const snapshot = await get(questionsRef);
+        
+        if (snapshot.exists()) {
+          this.questions = Object.values(snapshot.val());
+        } else {
+          this.questions = [];
+          this.error = 'No questions found';
+        }
+      } catch (error) {
+        this.error = 'Failed to fetch questions';
+        console.error('Error fetching questions:', error);
+        this.questions = [];
+      } finally {
+        this.isLoading = false;
+      }
     },
+
     submitAnswer(questionId, answer) {
+      if (!this.questions.find(q => q.qid === questionId)) {
+        throw new Error('Invalid question ID');
+      }
       this.answers[questionId] = answer;
-      console.log('Submitted answers:', this.answers); // Debug log
     },
+
     calculateScore() {
       this.score = this.questions.reduce((score, question) => {
-        console.log('Checking question:', question); // Debug log
-        console.log('User answer:', this.answers[question.qid]); // Debug log
-        console.log('Correct answer:', question.correctAnswer); // Debug log
-        if (this.answers[question.qid] === question.correctAnswer) {
-          return score + 1;
-        }
-        return score;
+        return this.answers[question.qid] === question.correctAnswer ? score + 1 : score;
       }, 0);
-      console.log('Calculated score:', this.score); // Debug log
     },
+
     async submitQuiz() {
-      this.calculateScore();
-      const response = await apiClient.post('/results', {
-        name: this.name,
-        sections: this.section,
-        questions: this.questions.map(q => ({
-          text: q.question,
-          correctAnswer: q.correctAnswer,
-          userAnswer: this.answers[q.qid]
-        })),
-        score: this.score
-      });
-      console.log('Submitted score:', this.score); // Debug log
-      this.score = response.data.score;
+      if (!this.name || !this.section) {
+        throw new Error('Name and section are required');
+      }
+
+      if (!this.isQuizComplete) {
+        throw new Error('Please answer all questions before submitting');
+      }
+
+      this.isLoading = true;
+      this.error = null;
+      
+      try {
+        this.calculateScore();
+        const db = getDatabase(app);
+        const resultsRef = dbRef(db, 'results');
+        
+        const quizResult = {
+          name: this.name,
+          section: this.section,
+          score: this.score,
+          totalQuestions: this.questions.length,
+          questions: this.questions.map(q => ({
+            text: q.question,
+            correctAnswer: q.correctAnswer,
+            userAnswer: this.answers[q.qid]
+          })),
+          createdAt: serverTimestamp()
+        };
+        
+        await push(resultsRef, quizResult);
+        this.results.push(quizResult);
+      } catch (error) {
+        this.error = 'Failed to submit quiz';
+        console.error('Error saving quiz results:', error);
+        throw error;
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    resetQuiz() {
+      this.answers = {};
+      this.score = 0;
+      this.name = '';
+      this.section = '';
+      this.error = null;
     }
   }
 });

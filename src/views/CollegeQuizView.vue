@@ -1,122 +1,175 @@
 <template>
-    <div class="flex h-dvh flex-col justify-center items-center max-w-3xl mx-auto p-6 shadow-md rounded-lg">
-        <div class="card bg-gray-50 w-[32rem] shadow-xl px-6 py-9 rounded-lg">
-            <div class="text-right  mb-4">
-                <p class="text-white px-4 py-2 rounded-lg bg-green-600 inline-block">Time left: {{ timeLeft }} seconds
-                </p>
+    <div class="min-h-dvh flex flex-col justify-center items-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+        <div class="card bg-white w-full sm:w-[32rem] shadow-2xl rounded-2xl overflow-hidden transform transition-all duration-300 hover:shadow-3xl">
+            <!-- Progress Bar -->
+            <div class="h-2 bg-gray-200">
+                <div class="h-full bg-blue-500 transition-all duration-300" 
+                     :style="{ width: progressPercentage }">
+                </div>
             </div>
-            <div v-if="loading" class="text-center text-gray-500">Loading questions...</div>
-            <div v-else>
-                <div v-if="currentQuestion" class="mb-6 p-4 border rounded-lg shadow-sm">
-                    <p class="text-lg font-semibold">{{ currentQuestion.question }}</p>
-                    <div class="mt-2 space-y-2">
-                        <label v-for="option in currentQuestion.options" :key="option"
-                            class="flex items-center space-x-2 cursor-pointer">
-                            <input type="radio" :name="'question-' + currentQuestion.qid" :value="option"
-                                v-model="selectedAnswer"
-                                class="w-4 h-4 text-blue-500 border-gray-300 focus:ring-blue-400" />
-                            <span class="text-gray-700">{{ option }}</span>
-                        </label>
+
+            <div class="p-6 sm:p-8">
+                <!-- Timer and Question Counter -->
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-600">Question {{ currentIndex + 1 }} of {{ quizStore.questions.length }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-lg font-semibold" :class="{ 'text-red-500': timeLeft < 10 }">{{ timeLeft }}s</span>
+                    </div>
+                </div>
+
+                <div v-if="loading" class="flex flex-col items-center justify-center py-12">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+                    <p class="text-gray-600">Loading questions...</p>
+                </div>
+
+                <div v-else class="space-y-6">
+                    <div v-if="currentQuestion" class="bg-gray-50 p-6 rounded-xl border border-gray-100 shadow-sm">
+                        <p class="text-lg sm:text-xl font-semibold text-gray-800 mb-6">{{ currentQuestion.question }}</p>
+                        <div class="space-y-3">
+                            <label v-for="option in currentQuestion.options" :key="option"
+                                class="flex items-center p-4 rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all duration-200 cursor-pointer group">
+                                <input type="radio" :name="'question-' + currentQuestion.qid" :value="option"
+                                    v-model="selectedAnswer"
+                                    class="w-5 h-5 text-blue-500 border-gray-300 focus:ring-blue-400" />
+                                <span class="ml-3 text-gray-700 group-hover:text-blue-600 transition-colors duration-200">{{ option }}</span>
+                            </label>
+                        </div>
                     </div>
 
+                    <button @click="submitAnswer"
+                        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-medium 
+                               hover:from-blue-600 hover:to-blue-700 transform hover:scale-[1.02] transition-all duration-200 
+                               shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="!selectedAnswer">
+                        {{ isLastQuestion ? 'Submit Quiz' : 'Next Question' }}
+                    </button>
+
+                    <p class="text-center text-xs text-gray-500 mt-4">Online Quiz Developed by JLT</p>
                 </div>
-                <button @click="submitAnswer"
-                    class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition">
-                    {{ isLastQuestion ? 'Submit' : 'Next' }}
-                </button>
-                <p class="p-6 text-sm text-red-600 text-justify">Note when you press the Next Button, your answer will
-                    automatically
-                    recorded. Dapat sigurado sya sayo este sigurado ka sa sagot mo bago mo pindutin ang Next Button.
-                    Good Luck!</p>
-                <p class="text-center  font-medium p-3 text-xs">Online Quiz Develop by JLT</p>
             </div>
         </div>
 
-        <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
-            <div class="bg-white relative p-6 rounded-lg h-[50dvh] shadow-lg max-w-md">
-                <h2 class="text-xl font-bold mb-4 text-center">Results</h2>
-                <div class="text-center">
-                    <p class="text-center text-2xl p-3">You've got a </p>
-                    <p class="text-5xl font-bold text-center py-6">{{ quizStore.score }} out of {{
-                        quizStore.questions.length }}</p>
-                    <p class="bg-green-600 text-gray-50 p-3 rounded-2xl my-3 text-3xl inline-block"
-                        v-if="quizStore.score >= (quizStore.questions.length / 2)">
-                        You're Amazing!
+        <!-- Results Modal -->
+        <div v-if="showModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-[90%] transform transition-all duration-300 scale-100">
+                <div class="text-center space-y-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Quiz Results</h2>
+                    <div class="relative">
+                        <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center">
+                            <span class="text-4xl font-bold text-white">{{ quizStore.score }}/{{ quizStore.questions.length }}</span>
+                        </div>
+                    </div>
+                    <p v-if="quizStore.score >= (quizStore.questions.length / 2)" 
+                       class="text-xl font-semibold text-green-600 animate-bounce">
+                        Congratulations! 🎉
                     </p>
-                    <p v-if="quizStore.score < (quizStore.questions.length / 2)">Go get better!</p>
-                </div>
-                <p class="text-center text-xs">Thank you for taking the quiz.</p>
-                <div class="flex justify-center p-3">
+                    <p v-else class="text-lg text-gray-600">
+                        Keep practicing! You'll do better next time 💪
+                    </p>
                     <router-link :to="{ name: 'home' }" @click.native="resetQuizData"
-                        class="mt-4 inline-block text-center bottom-4 absolute  text-gray-900 w-32  mx-auto rounded-lg underline">Back
-                        to Home</router-link>
+                        class="inline-block px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200">
+                        Back to Home
+                    </router-link>
                 </div>
-
             </div>
         </div>
 
-        <div v-if="showWarning" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
-            <div class="bg-white p-6 rounded-lg shadow-lg max-w-md">
-                <h2 class="text-xl font-bold mb-4">Warning</h2>
-                <p class="text-lg">Please select an answer before proceeding.</p>
-                <button @click="closeWarning"
-                    class="mt-4 bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600">Close</button>
+        <!-- Warning Modal -->
+        <div v-if="showWarning" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+            <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-[90%] transform transition-all duration-300 scale-100">
+                <div class="text-center space-y-4">
+                    <div class="w-12 h-12 mx-auto bg-red-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-semibold text-gray-800">Please Select an Answer</h2>
+                    <p class="text-gray-600">You need to choose an option before proceeding to the next question.</p>
+                    <button @click="closeWarning"
+                        class="mt-4 px-6 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors duration-200">
+                        Close
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </template>
 
-<script>
-import { onMounted, ref, computed, watch } from 'vue';
+<script lang="ts">
+import { defineComponent, onMounted, ref, computed, watch } from 'vue';
 import { useQuizStore } from '../stores/quiz';
+import { useRouter } from 'vue-router';
 
-export default {
+interface Question {
+    qid: string;
+    question: string;
+    options: string[];
+}
+
+export default defineComponent({
+    name: 'CollegeQuizView',
     setup() {
+        const router = useRouter();
         const quizStore = useQuizStore();
-        const loading = ref(true);
-        const currentIndex = ref(0);
-        const selectedAnswer = ref(null);
-        const showModal = ref(false);
-        const showWarning = ref(false);
-        const timeLeft = ref(30); // Set the timer duration in seconds
-        let timer = null;
+        const loading = ref<boolean>(true);
+        const currentIndex = ref<number>(0);
+        const selectedAnswer = ref<string | null>(null);
+        const showModal = ref<boolean>(false);
+        const showWarning = ref<boolean>(false);
+        const timeLeft = ref<number>(45);
+        let timer: number | null = null;
 
-        const currentQuestion = computed(() => quizStore.questions[currentIndex.value]);
-        const isLastQuestion = computed(() => currentIndex.value === quizStore.questions.length - 1);
+        const currentQuestion = computed<Question | undefined>(() => quizStore.questions[currentIndex.value]);
+        const isLastQuestion = computed<boolean>(() => currentIndex.value === quizStore.questions.length - 1);
+        const progressPercentage = computed<string>(() => 
+            `${((currentIndex.value + 1) / quizStore.questions.length) * 100}%`
+        );
 
-        const shuffleArray = (array) => {
-            for (let i = array.length - 1; i > 0; i--) {
+        const shuffleArray = <T>(array: T[]): T[] => {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
-            return array;
+            return shuffled;
         };
 
-        const fetchQuestions = async () => {
-            await quizStore.fetchQuestions();
-            quizStore.questions = shuffleArray(quizStore.questions);
-            loading.value = false;
-            startTimer();
+        const fetchQuestions = async (): Promise<void> => {
+            try {
+                await quizStore.fetchQuestions();
+                quizStore.questions = shuffleArray(quizStore.questions);
+                loading.value = false;
+                startTimer();
+            } catch (error) {
+                console.error('Error fetching questions:', error);
+                loading.value = false;
+            }
         };
 
-        const startTimer = () => {
-            timeLeft.value = 30; // Reset the timer duration
+        const startTimer = (): void => {
+            timeLeft.value = 45;
             if (timer) clearInterval(timer);
-            timer = setInterval(() => {
+            timer = window.setInterval(() => {
                 if (timeLeft.value > 0) {
                     timeLeft.value--;
                 } else {
-                    clearInterval(timer);
+                    clearInterval(timer!);
                     proceedToNextQuestion();
                 }
             }, 1000);
         };
 
-        const proceedToNextQuestion = async () => {
-            if (selectedAnswer.value) {
-                quizStore.submitAnswer(currentQuestion.value.qid, selectedAnswer.value);
+        const proceedToNextQuestion = async (): Promise<void> => {
+            if (selectedAnswer.value && currentQuestion.value) {
+                await quizStore.submitAnswer(currentQuestion.value.qid, selectedAnswer.value);
                 selectedAnswer.value = null;
             }
+            
             if (isLastQuestion.value) {
                 await quizStore.submitQuiz();
                 showModal.value = true;
@@ -126,10 +179,16 @@ export default {
             }
         };
 
-        const submitAnswer = async () => {
-            if (selectedAnswer.value) {
-                quizStore.submitAnswer(currentQuestion.value.qid, selectedAnswer.value);
+        const submitAnswer = async (): Promise<void> => {
+            if (!selectedAnswer.value) {
+                showWarning.value = true;
+                return;
+            }
+
+            if (currentQuestion.value) {
+                await quizStore.submitAnswer(currentQuestion.value.qid, selectedAnswer.value);
                 selectedAnswer.value = null;
+                
                 if (isLastQuestion.value) {
                     await quizStore.submitQuiz();
                     showModal.value = true;
@@ -137,20 +196,18 @@ export default {
                     currentIndex.value++;
                     startTimer();
                 }
-            } else {
-                showWarning.value = true;
             }
         };
 
-        const closeModal = () => {
+        const closeModal = (): void => {
             showModal.value = false;
         };
 
-        const closeWarning = () => {
+        const closeWarning = (): void => {
             showWarning.value = false;
         };
 
-        const resetQuizData = () => {
+        const resetQuizData = (): void => {
             quizStore.questions = [];
             quizStore.answers = {};
             quizStore.score = 0;
@@ -160,9 +217,17 @@ export default {
             selectedAnswer.value = null;
             showModal.value = false;
             showWarning.value = false;
-            clearInterval(timer);
+            if (timer) clearInterval(timer);
         };
 
+        // Watch for route changes to reset quiz data
+        watch(() => router.currentRoute.value.name, (newRoute) => {
+            if (newRoute === 'home') {
+                resetQuizData();
+            }
+        });
+
+        // Cleanup on component unmount
         onMounted(() => {
             fetchQuestions();
         });
@@ -180,8 +245,38 @@ export default {
             closeWarning,
             resetQuizData,
             isLastQuestion,
-            timeLeft
+            timeLeft,
+            progressPercentage
         };
     }
-};
+});
 </script>
+
+<style scoped>
+/* Add any component-specific styles here */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+/* Add smooth transitions for all interactive elements */
+button, .option-label {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Add focus styles for accessibility */
+button:focus, input:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Add reduced motion media query for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .card, button, .option-label {
+        transition: none;
+    }
+}
+</style>

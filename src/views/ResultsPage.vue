@@ -29,7 +29,7 @@
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-for="item in filteredResults" :key="item._id">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.name }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.sections }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.section }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.score }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ new
               Date(item.createdAt).toLocaleDateString() }}</td>

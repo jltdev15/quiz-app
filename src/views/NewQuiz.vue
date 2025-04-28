@@ -1,18 +1,26 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import axios from 'axios';
+import { getDatabase, ref as dbRef, push, get, query, orderByChild, limitToLast } from 'firebase/database';
+import app from '../firebase';
 
-import apiClient from '../axiosClient.js';
+const db = getDatabase(app);
 const qid = ref(null);
 const question = ref('');
 const options = ref(['']);
 const correctAnswer = ref('');
 
 const fetchQuestionCount = async () => {
-
   try {
-    const response = await apiClient.get('/questions/count');
-    qid.value = response.data.count + 1;
+    const questionsRef = dbRef(db, 'questions');
+    const q = query(questionsRef, orderByChild('qid'), limitToLast(1));
+    const snapshot = await get(q);
+    
+    if (snapshot.exists()) {
+      const lastQuestion = Object.values(snapshot.val())[0];
+      qid.value = lastQuestion.qid + 1;
+    } else {
+      qid.value = 1;
+    }
   } catch (error) {
     console.error('Error fetching question count:', error);
   }
@@ -26,7 +34,8 @@ const submitQuestion = async () => {
       options: options.value,
       correctAnswer: correctAnswer.value
     };
-    await apiClient.post('/questions/add', newQuestion);
+    
+    await push(dbRef(db, 'questions'), newQuestion);
     alert('Question submitted successfully!');
     // Reset form
     qid.value += 1;
